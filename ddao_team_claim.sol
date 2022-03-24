@@ -35,6 +35,7 @@ contract DDAOTeamClaim is AccessControl
     uint48  public TimeUpdate;
 
     mapping(uint8 => uint8)public Group;
+    bool public Enable = false;
 
     mapping(uint8 => mapping(address => uint8))public Member;
 
@@ -271,6 +272,7 @@ contract DDAOTeamClaim is AccessControl
     }
     function Claim(uint8 id,address addr,uint256 amount)public
     {
+	require(Enable,"Contract not Enabled (or Disabled)");
 	uint256 amount2;
 	uint256 balanceOfToken;
 	amount2 = RewardByAddr(id,addr);
@@ -297,6 +299,7 @@ contract DDAOTeamClaim is AccessControl
     }
     function StakeRecalc()public
     {
+	require(Enable,"Contract not Enabled (or Disabled)");
 	address addr;
 	ret memory r;
 	for(uint8 i=1;i <= 4;i++)
@@ -332,5 +335,9 @@ contract DDAOTeamClaim is AccessControl
     function TimeNow()public view returns(uint256)
     {
 	return block.timestamp;
+    }
+    function EnabledSet(bool true_or_false)public onlyAdmin
+    {
+	Enable =  true_or_false;
     }
 }
