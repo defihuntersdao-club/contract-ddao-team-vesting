@@ -32,11 +32,23 @@ contract DDAOTeamClaim is AccessControl
 
     address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
     address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
-    uint48  public UpdateTime;
+    uint48  public TimeUpdate;
 
     mapping(uint8 => uint8)public Group;
 
     mapping(uint8 => mapping(address => uint8))public Member;
+
+    uint256 public HistoryNum;
+    mapping (uint256 => history)public History;
+
+    struct history
+    {
+	uint256 num;
+	address addr;
+	uint256 amount;
+	uint256 payed;
+	uint48 time;
+    }
 
     struct personal
     {
@@ -86,7 +98,7 @@ contract DDAOTeamClaim is AccessControl
 	}
 	constructor() 
 	{
-	UpdateTime = TimeStart;
+	TimeUpdate = TimeStart;
         // TECH TEAM 
 	Group[1] = 10;
 	// ADVISER
@@ -239,7 +251,7 @@ contract DDAOTeamClaim is AccessControl
 	t = time;
 	if(t > TimeEnd) t = TimeEnd;
 
-	d = t-UpdateTime;
+	d = t-TimeUpdate;
 	s = AmountMax * 10**18;
 	s = s * d / (TimeEnd - TimeStart);
 
@@ -275,6 +287,12 @@ contract DDAOTeamClaim is AccessControl
 	require(balanceOfToken >= amount_to_send,"Not enough balance of DDAO on contract. Contact with administration");
 	Personal[id][addr].payed = Personal[id][addr].payed.add(amount_to_send);
 	IToken(AddrDDAO).transfer(addr,amount_to_send);
+	HistoryNum = HistoryNum.add(1);
+	History[HistoryNum].num = HistoryNum;
+	History[HistoryNum].addr = addr;
+	History[HistoryNum].amount = amount_to_send;
+	History[HistoryNum].time = uint48(block.timestamp);
+	History[HistoryNum].payed = Personal[id][addr].payed;
 	emit eClaim(id,addr,amount_to_send,Personal[id][addr].payed);
     }
     function StakeRecalc()public
@@ -291,7 +309,7 @@ contract DDAOTeamClaim is AccessControl
 	    emit eStakeRecalc(i,addr,r.amount,Personal[i][addr].staked,uint48(block.timestamp));
 	}
 	}
-	UpdateTime = uint48(block.timestamp);
+	TimeUpdate = uint48(block.timestamp);
     }
     function TokenBalance()public view returns(uint256)
     {
