@@ -251,7 +251,7 @@ contract DDAOTeamClaim is AccessControl
 	{
 	    if(GroupMember[id][j] == addr)
 	    {
-		val = RewardCalc(id,j);
+		val = RewardCalc(id,j,0);
 		return val.amount;
 	    }
 	}
@@ -286,7 +286,7 @@ contract DDAOTeamClaim is AccessControl
 	for(uint8 j=1;j <= GroupLen[i];j++)
 	{
 	    addr = GroupMember[i][j];
-	    r = RewardCalc(i,j);
+	    r = RewardCalc(i,j,0);
 	    Personal[i][addr].staked = Personal[i][addr].staked.add(r.amount);
 	    emit eStakeRecalc(i,addr,r.amount,Personal[i][addr].staked,uint48(block.timestamp));
 	}
