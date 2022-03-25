@@ -26,17 +26,17 @@ contract DDAOTeamClaim is AccessControl
     using SafeMath  for uint256;
     using SafeERC20 for IERC20;
 
-    uint48  constant public TimeStart = 1646092800; // 1 MAR 2022
-    uint256 constant public AmountMax = 1680000;
-    uint48  constant public TimeEnd = TimeStart + 24 * 86400*30;
+    uint48  constant public TimeStart 	= 1646092800; // 1 MAR 2022
+    uint256 constant public AmountMax 	= 1680000;
+    uint48  constant public TimeEnd 	= TimeStart + 24 * 86400*30;
+    uint48  immutable public TimeDeploy;
 
     address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
     address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
     uint48  public TimeUpdate;
-//    mapping (address => uint48)public TimeUpdateByUser;
 
     mapping(uint8 => uint8)public Group;
-    bool public Enable = false;
+    bool public Enable = true;
 
     mapping(uint8 => mapping(address => uint8))public Member;
 
@@ -61,8 +61,8 @@ contract DDAOTeamClaim is AccessControl
     }
     mapping(uint8 => mapping(address => personal))public Personal;
 
-    event eStakeRecalc(uint8 id,address addr,uint256 amount,uint256 staked,uint48 time);
-    event eClaim(uint8 id,address addr,uint256 amount,uint256 payed);
+    event eStakeRecalc(uint8 id,address addr,uint256 amount,uint256 staked,uint256 payed,uint48 time);
+    event eClaim(uint8 id,address addr,uint256 amount,uint256 payed,uint256 prev_staked);
 
 	mapping(uint8 => mapping(uint8 => address))public GroupMember;
 	mapping(uint8 => address[]) GroupMemberAddr;
@@ -70,6 +70,7 @@ contract DDAOTeamClaim is AccessControl
 	function GroupMemberAdd(uint8 id,address addr,uint8 val,uint48 time)public onlyAdmin
 	{
 	    require(GroupLen[id]<256,"The group is full");
+	    if(TimeDeploy != block.timestamp)StakeRecalc();
 	    GroupLen[id]++;
 	    Member[id][addr] = val;
 	    GroupMember[id][GroupLen[id]] = addr;
@@ -77,10 +78,12 @@ contract DDAOTeamClaim is AccessControl
 	    Personal[id][addr].id = GroupLen[id];
 	    Personal[id][addr].staked = 0;
 	    Personal[id][addr].payed = 0;
+
 	    if(time != 0)
 	    Personal[id][addr].updated = time;
 	    else
-	    Personal[id][addr].updated = uint48(block.timestamp);	
+	    Personal[id][addr].updated = uint48(block.timestamp);
+
 	}
 	function GroupMemberChange(uint8 id,address addr,uint8 val)public onlyAdmin
 	{
@@ -105,6 +108,7 @@ contract DDAOTeamClaim is AccessControl
 	}
 	constructor() 
 	{
+	TimeDeploy 	= uint48(block.timestamp);
 	TimeUpdate = TimeStart;
         // TECH TEAM 
 	Group[1] = 10;
@@ -121,8 +125,8 @@ contract DDAOTeamClaim is AccessControl
 	    GroupLen[4] = 0;
 	    _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 	    Admins.push(_msgSender());
-	    //_setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
-	    AdminAdd(0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
+	    _setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
+	    //AdminAdd(_msgSender());
 
 		GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90,TimeStart);
 		GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5,TimeStart);
@@ -130,10 +134,11 @@ contract DDAOTeamClaim is AccessControl
 
 		GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,45,TimeStart);
 
-		GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,50,TimeStart);
+		GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,10,TimeStart);
 
 		GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45,TimeStart);
 		GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45,TimeStart);
+
     
 	    if( block.chainid == 80001)
 	    {
@@ -146,6 +151,8 @@ contract DDAOTeamClaim is AccessControl
 		AddrDDAO = 0x086F80a0ebC2a92bBb3e4476b30f67D058a4c26A;
 		AddrProxy = 0x8356B4Dd5397Dd8519512562c92b8EC14Df73541;
 	    }
+
+	    StakeRecalc();
 	}
 
 	// Start: Admin functions
@@ -278,7 +285,8 @@ contract DDAOTeamClaim is AccessControl
 	}
 	return 0;
     }
-    function Claim(uint8 id,address addr,uint256 amount)public
+    uint8 public claim_debug = 0;
+    function Claim(uint8 id,address addr,uint256 amount,uint8 debug)public
     {
 	require(Enable,"Contract not Enabled (or Disabled)");
 	uint256 amount2;
@@ -286,8 +294,23 @@ contract DDAOTeamClaim is AccessControl
 	amount2 = RewardByAddr(id,addr,false);
 	require(amount <= amount2,"You cannot get more than the tokens credited");
 	if(amount < amount2 && amount > 0)amount2 = amount;
-	uint256 amount_to_send;
-	amount_to_send = amount2.sub(Personal[id][addr].payed);
+	uint256 amount_to_send = amount2;
+	require(debug != 1,"Test debug 1");	
+
+	if(Personal[id][addr].payed > 0)
+	amount_to_send = amount_to_send.div(Personal[id][addr].payed);
+
+	require(debug != 2,"Test debug 2");
+
+	uint256 prev_staked = 0;
+	if(Personal[id][addr].staked > 0)
+	{
+	amount_to_send = amount2.add(Personal[id][addr].staked);
+	prev_staked = Personal[id][addr].staked;
+	}
+
+	require(debug != 3,"Test debug 3");
+
 	balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
 	if(balanceOfToken < amount_to_send)
 	{
@@ -295,7 +318,11 @@ contract DDAOTeamClaim is AccessControl
 	    balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
 	}
 	require(balanceOfToken >= amount_to_send,"Not enough balance of DDAO on contract. Contact with administration");
+
 	Personal[id][addr].payed = Personal[id][addr].payed.add(amount_to_send);
+	Personal[id][addr].staked = 0;
+	require(debug != 4,"Test debug 4");
+
 	IToken(AddrDDAO).transfer(addr,amount_to_send);
 	HistoryNum = HistoryNum.add(1);
 	History[HistoryNum].num = HistoryNum;
@@ -303,7 +330,15 @@ contract DDAOTeamClaim is AccessControl
 	History[HistoryNum].amount = amount_to_send;
 	History[HistoryNum].time = uint48(block.timestamp);
 	History[HistoryNum].payed = Personal[id][addr].payed;
-	emit eClaim(id,addr,amount_to_send,Personal[id][addr].payed);
+
+	require(debug != 5,"Test debug 5");
+
+	emit eClaim(id,addr,amount_to_send,Personal[id][addr].payed,prev_staked);
+	require(debug != 6,"Test debug 6");
+	//StakeRecalc();
+	claim_debug += 1;
+	require(debug != 7,"Test debug 7");
+
     }
     function StakeRecalc()public
     {
@@ -317,7 +352,7 @@ contract DDAOTeamClaim is AccessControl
 	    addr = GroupMember[i][j];
 	    r = RewardCalc(i,j,0);
 	    Personal[i][addr].staked = Personal[i][addr].staked.add(r.amount);
-	    emit eStakeRecalc(i,addr,r.amount,Personal[i][addr].staked,uint48(block.timestamp));
+	    emit eStakeRecalc(i,addr,r.amount,Personal[i][addr].staked,Personal[i][addr].payed,uint48(block.timestamp));
 	}
 	}
 	TimeUpdate = uint48(block.timestamp);
