@@ -33,6 +33,7 @@ contract DDAOTeamClaim is AccessControl
     address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
     address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
     uint48  public TimeUpdate;
+//    mapping (address => uint48)public TimeUpdateByUser;
 
     mapping(uint8 => uint8)public Group;
     bool public Enable = false;
@@ -56,6 +57,7 @@ contract DDAOTeamClaim is AccessControl
 	uint8 id;
 	uint256 staked;
 	uint256 payed;
+	uint48 updated;
     }
     mapping(uint8 => mapping(address => personal))public Personal;
 
@@ -65,7 +67,7 @@ contract DDAOTeamClaim is AccessControl
 	mapping(uint8 => mapping(uint8 => address))public GroupMember;
 	mapping(uint8 => address[]) GroupMemberAddr;
 	mapping(uint8 => uint8)public GroupLen;
-	function GroupMemberAdd(uint8 id,address addr,uint8 val)public onlyAdmin
+	function GroupMemberAdd(uint8 id,address addr,uint8 val,uint48 time)public onlyAdmin
 	{
 	    require(GroupLen[id]<256,"The group is full");
 	    GroupLen[id]++;
@@ -75,8 +77,12 @@ contract DDAOTeamClaim is AccessControl
 	    Personal[id][addr].id = GroupLen[id];
 	    Personal[id][addr].staked = 0;
 	    Personal[id][addr].payed = 0;
+	    if(time != 0)
+	    Personal[id][addr].updated = time;
+	    else
+	    Personal[id][addr].updated = uint48(block.timestamp);	
 	}
-	function GroupMemeberChange(uint8 id,address addr,uint8 val)public onlyAdmin
+	function GroupMemberChange(uint8 id,address addr,uint8 val)public onlyAdmin
 	{
 	    Member[id][addr] = val;
 	}
@@ -115,20 +121,19 @@ contract DDAOTeamClaim is AccessControl
 	    GroupLen[4] = 0;
 	    _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 	    Admins.push(_msgSender());
-	    _setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
-	    //AdminAdd(_msgSender());
+	    //_setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
+	    AdminAdd(0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
 
-		GroupMemberAdd(1,0xa5B32272f2FE16d402Fe6Da4EDfF84cD6f8e4AA0,10);
-		GroupMemberAdd(1,0xe44b45E38E5Fe6d39c0370E55eB2453E25F7c3C5,10);
-		GroupMemberAdd(1,0xF11Ffb4848e8a2E05eAb2cAfb02108277b56d0B7,10);
-		GroupMemberAdd(1,0xB2207c34dE61f3018576cb637Fa90DAE0425D916,10);
+		GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90,TimeStart);
+		GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5,TimeStart);
+		GroupMemberAdd(1,0x5BB72943dFd6201897d163D06DaEC4c4557Ab25c, 5,TimeStart);
 
-		GroupMemberAdd(2,0xe44b45E38E5Fe6d39c0370E55eB2453E25F7c3C5,45);
+		GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,45,TimeStart);
 
-		GroupMemberAdd(3,0xa5B32272f2FE16d402Fe6Da4EDfF84cD6f8e4AA0,10);
+		GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,50,TimeStart);
 
-		GroupMemberAdd(4,0x97299ea1C42b3fA53b805e0E92b1e05500519762,45);
-		GroupMemberAdd(4,0x9134408d47239DD81402723B8f0444cf66B82e5D,45);
+		GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45,TimeStart);
+		GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45,TimeStart);
     
 	    if( block.chainid == 80001)
 	    {

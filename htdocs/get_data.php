@@ -450,7 +450,9 @@ foreach($mas as $v2)
 	    case "4":
 		$n = "time";
 		$v = hexdec($v);
+		$t3[utime] = $v;
 		$v = date("Y-m-d H:i:s",$v);
+
 	    break;
 
 
