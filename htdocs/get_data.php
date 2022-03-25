@@ -376,7 +376,7 @@ $a = json_encode($o2,192);
 $f = "res.json";
 file_put_contents($f,$a);
 
-unset($jss);
+unset($jss,$mas);
 for($i=1;$i<=$o2[HistoryNum];$i++)
 {
 $b = "0xb436af75";
@@ -417,3 +417,48 @@ $t = time()-$t;
 print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
 
 print_r($mas);
+foreach($mas as $v2)
+{
+    unset($t2,$t3);
+    $t = $v2[result];
+    $t = substr($t,2);
+    $l = strlen($t)/64;
+    for($i = 0;$i<$l;$i++)
+    {
+	$v = substr($t,$i*64,64);
+	switch($i."")
+	{
+	    case "0":
+		$n = "num";
+		$v = hexdec($v);
+	    break;
+
+	    case "1":
+		$n = "addr";
+		$v = "0x".substr($v,24);
+	    break;
+	    case "2":
+		$n = "amount";
+		$v = hexdec($v);
+		$v /= 10**18;
+	    break;
+	    case "3":
+		$n = "payed";
+		$v = hexdec($v);
+		$v /= 10**18;
+	    break;
+	    case "4":
+		$n = "time";
+		$v = hexdec($v);
+		$v = date("Y-m-d H:i:s",$v);
+	    break;
+
+
+	}
+	$t3[$n] = $v;
+    }
+    $o2[history][$t3[num]] = $t3;
+//    print_r($t3);
+
+}
+print_r($o2);
