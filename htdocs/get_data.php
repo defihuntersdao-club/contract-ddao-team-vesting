@@ -10,8 +10,9 @@ AmountMax:      0xa4ae6072
 TimeStart:      0x3962c4ff
 TimeEnd:        0x52bd9914
 TimeNow:        0xb597842a
-UpdateTime:     0x1bbe5a9a
+TimeUpdate:     0x93bcd90f
 ";
+//UpdateTime:     0x1bbe5a9a
 $a = trim($a);
 $mas = explode("\n",$a);
 $preg = "/[\s]{1,100}/sim";
