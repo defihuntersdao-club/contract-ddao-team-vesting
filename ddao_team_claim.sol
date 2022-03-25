@@ -257,14 +257,17 @@ contract DDAOTeamClaim is AccessControl
 	s = s * d / (TimeEnd - TimeStart);
 
     }
-    function RewardByAddr(uint8 id,address addr)public view returns(uint256)
+    function RewardByAddr(uint8 id,address addr,bool without_payed)public view returns(uint256)
     {
+	uint256 adder;
 	ret memory val;
 	for(uint8 j=1;j <= GroupLen[id];j++)
 	{
 	    if(GroupMember[id][j] == addr)
 	    {
+		if(without_payed)adder = Personal[id][addr].payed;
 		val = RewardCalc(id,j,0);
+		val.amount -= adder;
 		return val.amount;
 	    }
 	}
@@ -275,7 +278,7 @@ contract DDAOTeamClaim is AccessControl
 	require(Enable,"Contract not Enabled (or Disabled)");
 	uint256 amount2;
 	uint256 balanceOfToken;
-	amount2 = RewardByAddr(id,addr);
+	amount2 = RewardByAddr(id,addr,false);
 	require(amount <= amount2,"You cannot get more than the tokens credited");
 	if(amount < amount2 && amount > 0)amount2 = amount;
 	uint256 amount_to_send;
@@ -336,8 +339,8 @@ contract DDAOTeamClaim is AccessControl
     {
 	return block.timestamp;
     }
-    function EnabledSet(bool true_or_false)public onlyAdmin
+    function EnabledSet(bool TrueOrFalse)public onlyAdmin
     {
-	Enable =  true_or_false;
+	Enable = TrueOrFalse;
     }
 }
