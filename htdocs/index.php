@@ -33,4 +33,4 @@ if($b != $md5)
 file_put_contents($f.".html",$a);
 file_put_contents($f.".md5",$md5);
 }
-print $a;
+//print $a;

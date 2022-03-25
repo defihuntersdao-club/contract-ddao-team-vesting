@@ -221,7 +221,8 @@ foreach($mas as $v2)
     }
 	$o2[$id] = $v;
 }
-print_r($o2);
+//print_r($o2);
+$o2[ContractAddress] = $contractAddress;
 
 unset($jss);
 foreach($o2[GroupMemberShow] as $grp=>$v3)
