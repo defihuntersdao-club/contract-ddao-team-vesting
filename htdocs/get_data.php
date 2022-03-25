@@ -11,6 +11,7 @@ TimeStart:      0x3962c4ff
 TimeEnd:        0x52bd9914
 TimeNow:        0xb597842a
 TimeUpdate:     0x93bcd90f
+HistoryNum:     0xbad7c6b7
 ";
 //UpdateTime:     0x1bbe5a9a
 $a = trim($a);
@@ -230,8 +231,12 @@ foreach($o2[GroupMemberShow] as $grp=>$v3)
 //================
 //$b = "0xc98dd75a";
 $b = "0x0d6b47b1";
+$b = "0xb436af75";
+//0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a5b32272f2fe16d402fe6da4edff84cd6f8e4aa
 $b .= view_number($grp,64,0);
 $b .= "".view_number(substr($v2,2),64,0);
+$b .= view_number(0,64,0);
+//$b .= "00000000000000000000000000000000000000000000000000000000000000000";
 //$b .= $v2;
 //0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a5b32272f2fe16d402fe6da4edff84cd6f8e4aa0
 unset($v,$t);
@@ -369,3 +374,45 @@ print_r($o2);
 $a = json_encode($o2,192);
 $f = "res.json";
 file_put_contents($f,$a);
+
+unset($jss);
+for($i=1;$i<=$o2[HistoryNum];$i++)
+{
+$b = "0xb436af75";
+$b = "0xa21f0368";
+//0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a5b32272f2fe16d402fe6da4edff84cd6f8e4aa
+$b .= view_number($i,64,0);
+//$b .= "".view_number(substr($v2,2),64,0);
+//$b .= view_number(0,64,0);
+//$b .= "00000000000000000000000000000000000000000000000000000000000000000";
+//$b .= $v2;
+//0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a5b32272f2fe16d402fe6da4edff84cd6f8e4aa0
+unset($v,$t);
+//$b .= view_number($i,64,0);
+//$t[from] = $wal;
+$t[from] = "0x0000000000000000000000000000000000000000";
+$t[data] = $b;
+$t[to] = $contractAddress;
+//print_r($t);
+
+$v[jsonrpc] = "2.0";
+$v[method] = "eth_call";
+//$v[params][0] = $row[wal];
+$v[params][0] = $t;
+$v[params][1] = "latest";
+//$v[id] = $row[id];
+$v[id] = "History_".$i;
+$jss[] = $v;
+
+}
+print "Send ".count($jss)." requests to blockchain\n";
+$t = $time;
+//print "Get data from blockchain in ".count($jss)." requests\n";
+if(count($jss))
+{
+$mas = curl_mas2($jss,$rpc,1);
+}
+$t = time()-$t;
+print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
+
+print_r($mas);
