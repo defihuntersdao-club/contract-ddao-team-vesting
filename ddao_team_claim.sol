@@ -35,6 +35,7 @@ contract DDAOTeamClaim is AccessControl
     address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
     address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
     uint48  public TimeUpdate;
+    uint48  public TimeStakeRecalc;
 
     mapping(uint8 => uint8)public Group;
     bool public Enable = true;
@@ -164,8 +165,6 @@ contract DDAOTeamClaim is AccessControl
 		GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45,TimeStart);
 		GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45,TimeStart);
 
-
-    
 	    if( block.chainid == 80001)
 	    {
 		AddrDDAO = 0xE1F0e40846218bF2CACfEd40c00bE218F54C49f7;
@@ -180,9 +179,6 @@ contract DDAOTeamClaim is AccessControl
 
 	    StakeRecalc();
 	    GroupMemberAdd(1,0x34B40BA116d5Dec75548a9e9A8f15411461E8c70, 90,0);
-	    StakeRecalc();
-	    StakeRecalc();
-	    StakeRecalc();
 	}
 
 	// Start: Admin functions
@@ -393,6 +389,7 @@ contract DDAOTeamClaim is AccessControl
     function StakeRecalc()public
     {
 	require(Enable,"Contract not Enabled (or Disabled)");
+	require(TimeStakeRecalc < uint48(block.timestamp),"It is forbidden to count the steak several times in one block");
 	address addr;
 	ret memory r;
 	AmountSavedToStake = AmountSavedToStake.add(RewardAllNow(0));
@@ -407,7 +404,8 @@ contract DDAOTeamClaim is AccessControl
 	    emit eStakeRecalc(i,j,addr,r.amount,Personal[i][addr].staked,Personal[i][addr].payed,uint48(block.timestamp));
 	}
 	}
-	TimeUpdate = uint48(block.timestamp);
+	TimeUpdate 	= uint48(block.timestamp);
+	TimeStakeRecalc = uint48(block.timestamp);
     }
     function TokenBalance()public view returns(uint256)
     {
