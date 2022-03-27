@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -30,6 +30,7 @@ contract DDAOTeamClaim is AccessControl
     uint256 constant public AmountMax 	= 1680000;
     uint48  constant public TimeEnd 	= TimeStart + 24 * 86400*30;
     uint48  immutable public TimeDeploy;
+    uint256 immutable public BlockDeploy;
 
     address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
     address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
@@ -50,6 +51,7 @@ contract DDAOTeamClaim is AccessControl
 	uint256 amount;
 	uint256 payed;
 	uint48 time;
+	uint256 blk;
     }
 
     struct personal
@@ -57,11 +59,12 @@ contract DDAOTeamClaim is AccessControl
 	uint8 id;
 	uint256 staked;
 	uint256 payed;
-	uint48 updated;
+	uint48  added;
+	uint48  updated;
     }
     mapping(uint8 => mapping(address => personal))public Personal;
 
-    event eStakeRecalc(uint8 id,address addr,uint256 amount,uint256 staked,uint256 payed,uint48 time);
+    event eStakeRecalc(uint8 id,uint8 nn,address addr,uint256 amount,uint256 staked,uint256 payed,uint48 time);
     event eClaim(uint8 id,address addr,uint256 amount,uint256 payed,uint256 prev_staked);
 
 	mapping(uint8 => mapping(uint8 => address))public GroupMember;
@@ -80,9 +83,29 @@ contract DDAOTeamClaim is AccessControl
 	    Personal[id][addr].payed = 0;
 
 	    if(time != 0)
+	    {
 	    Personal[id][addr].updated = time;
+	    }
 	    else
+	    {
 	    Personal[id][addr].updated = uint48(block.timestamp);
+	    }
+
+	    if(TimeDeploy == block.timestamp && time == TimeStart)
+	    {
+	    Personal[id][addr].added = TimeStart;
+	    }
+	    else
+	    {
+	        if(time != 0)
+    		{
+	        Personal[id][addr].added = time;
+    		}
+    		else
+    		{
+    	        Personal[id][addr].added = uint48(block.timestamp);
+    		}
+	    }
 
 	}
 	function GroupMemberChange(uint8 id,address addr,uint8 val)public onlyAdmin
@@ -109,6 +132,7 @@ contract DDAOTeamClaim is AccessControl
 	constructor() 
 	{
 	TimeDeploy 	= uint48(block.timestamp);
+	BlockDeploy 	= block.number;
 	TimeUpdate = TimeStart;
         // TECH TEAM 
 	Group[1] = 10;
@@ -125,8 +149,9 @@ contract DDAOTeamClaim is AccessControl
 	    GroupLen[4] = 0;
 	    _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 	    Admins.push(_msgSender());
-	    _setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
+	    //_setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
 	    //AdminAdd(_msgSender());
+	    AdminAdd(0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
 
 		GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90,TimeStart);
 		GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5,TimeStart);
@@ -138,6 +163,7 @@ contract DDAOTeamClaim is AccessControl
 
 		GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45,TimeStart);
 		GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45,TimeStart);
+
 
     
 	    if( block.chainid == 80001)
@@ -152,6 +178,10 @@ contract DDAOTeamClaim is AccessControl
 		AddrProxy = 0x8356B4Dd5397Dd8519512562c92b8EC14Df73541;
 	    }
 
+	    StakeRecalc();
+	    GroupMemberAdd(1,0x34B40BA116d5Dec75548a9e9A8f15411461E8c70, 90,0);
+	    StakeRecalc();
+	    StakeRecalc();
 	    StakeRecalc();
 	}
 
@@ -222,7 +252,7 @@ contract DDAOTeamClaim is AccessControl
 	uint256 part_by_addr;
 	uint256 reward_all;
     }
-    function RewardCalc(uint8 id,uint8 nn,uint48 time)public view returns(ret memory b)
+    function RewardCalc(uint8 id, uint8 nn, uint48 time)public view returns(ret memory b)
     {
 	uint256 x;
 	uint256 y;
@@ -251,9 +281,28 @@ contract DDAOTeamClaim is AccessControl
 	    
 	    x = z*y;
 	    b.amount = r * x / 10**36;
+	    b.amount = b.amount.add(Personal[id][addr].staked);
     }
     event eRecalc(uint256 time,uint256 block,address addr,uint8 group,uint256 part_group,uint256 part_member,uint256 amount);
+    uint256 public AmountSavedToStake = 0;
     function RewardAllNow(uint48 time)public view returns(uint256 s)
+    {
+	uint48 t;
+	uint48 d;
+
+	if(time == 0)
+	t = uint48(block.timestamp);
+	else
+	t = time;
+	if(t > TimeEnd) t = TimeEnd;
+
+	d = t-TimeUpdate;
+	s = AmountMax * 10**18 ;
+	s = s * (TimeEnd - TimeUpdate) / (TimeEnd - TimeStart);
+	s = s * d / (TimeEnd - TimeStart);
+
+    }
+    function RewardAllNow2(uint48 time)public view returns(uint256 s)
     {
 	uint48 t;
 	uint48 d;
@@ -285,8 +334,8 @@ contract DDAOTeamClaim is AccessControl
 	}
 	return 0;
     }
-    uint8 public claim_debug = 0;
-    function Claim(uint8 id,address addr,uint256 amount,uint8 debug)public
+    //uint8 public claim_debug = 0;
+    function Claim(uint8 id,address addr,uint256 amount)public
     {
 	require(Enable,"Contract not Enabled (or Disabled)");
 	uint256 amount2;
@@ -295,12 +344,12 @@ contract DDAOTeamClaim is AccessControl
 	require(amount <= amount2,"You cannot get more than the tokens credited");
 	if(amount < amount2 && amount > 0)amount2 = amount;
 	uint256 amount_to_send = amount2;
-	require(debug != 1,"Test debug 1");	
+	//require(debug != 1,"Test debug 1");	
 
 	if(Personal[id][addr].payed > 0)
 	amount_to_send = amount_to_send.div(Personal[id][addr].payed);
 
-	require(debug != 2,"Test debug 2");
+	//require(debug != 2,"Test debug 2");
 
 	uint256 prev_staked = 0;
 	if(Personal[id][addr].staked > 0)
@@ -309,7 +358,7 @@ contract DDAOTeamClaim is AccessControl
 	prev_staked = Personal[id][addr].staked;
 	}
 
-	require(debug != 3,"Test debug 3");
+	//require(debug != 3,"Test debug 3");
 
 	balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
 	if(balanceOfToken < amount_to_send)
@@ -321,7 +370,7 @@ contract DDAOTeamClaim is AccessControl
 
 	Personal[id][addr].payed = Personal[id][addr].payed.add(amount_to_send);
 	Personal[id][addr].staked = 0;
-	require(debug != 4,"Test debug 4");
+	//require(debug != 4,"Test debug 4");
 
 	IToken(AddrDDAO).transfer(addr,amount_to_send);
 	HistoryNum = HistoryNum.add(1);
@@ -330,14 +379,15 @@ contract DDAOTeamClaim is AccessControl
 	History[HistoryNum].amount = amount_to_send;
 	History[HistoryNum].time = uint48(block.timestamp);
 	History[HistoryNum].payed = Personal[id][addr].payed;
+	History[HistoryNum].blk = uint48(block.number);
 
-	require(debug != 5,"Test debug 5");
+	//require(debug != 5,"Test debug 5");
 
 	emit eClaim(id,addr,amount_to_send,Personal[id][addr].payed,prev_staked);
-	require(debug != 6,"Test debug 6");
+	//require(debug != 6,"Test debug 6");
 	//StakeRecalc();
-	claim_debug += 1;
-	require(debug != 7,"Test debug 7");
+	//claim_debug += 1;
+	//require(debug != 7,"Test debug 7");
 
     }
     function StakeRecalc()public
@@ -345,6 +395,8 @@ contract DDAOTeamClaim is AccessControl
 	require(Enable,"Contract not Enabled (or Disabled)");
 	address addr;
 	ret memory r;
+	AmountSavedToStake = AmountSavedToStake.add(RewardAllNow(0));
+
 	for(uint8 i=1;i <= 4;i++)
 	{
 	for(uint8 j=1;j <= GroupLen[i];j++)
@@ -352,7 +404,7 @@ contract DDAOTeamClaim is AccessControl
 	    addr = GroupMember[i][j];
 	    r = RewardCalc(i,j,0);
 	    Personal[i][addr].staked = Personal[i][addr].staked.add(r.amount);
-	    emit eStakeRecalc(i,addr,r.amount,Personal[i][addr].staked,Personal[i][addr].payed,uint48(block.timestamp));
+	    emit eStakeRecalc(i,j,addr,r.amount,Personal[i][addr].staked,Personal[i][addr].payed,uint48(block.timestamp));
 	}
 	}
 	TimeUpdate = uint48(block.timestamp);
@@ -383,4 +435,14 @@ contract DDAOTeamClaim is AccessControl
     {
 	Enable = TrueOrFalse;
     }
+    function PayedByAddr(uint8 id,address addr)public view returns(uint256)
+    {
+	return Personal[id][addr].payed;
+    }
+    function StakedByAddr(uint8 id,address addr)public view returns(uint256)
+    {
+	return Personal[id][addr].staked;
+    }
+
+
 }

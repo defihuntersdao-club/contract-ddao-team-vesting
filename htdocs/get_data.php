@@ -7,11 +7,14 @@ AddrDDAO:       0x52f36998
 AddrProxy:      0x14590dd7
 AdminList:      0x90fc4ebb
 AmountMax:      0xa4ae6072
+AmountSavedToStake:     0x5748be9a
 TimeStart:      0x3962c4ff
 TimeEnd:        0x52bd9914
 TimeNow:        0xb597842a
 TimeUpdate:     0x93bcd90f
 HistoryNum:     0xbad7c6b7
+BlockDeploy:    0x9c05f302
+
 ";
 //UpdateTime:     0x1bbe5a9a
 $a = trim($a);
@@ -158,7 +161,7 @@ $mas = curl_mas2($jss,$rpc,1);
 $t = time()-$t;
 print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
 
-print_r($mas);
+//print_r($mas);
 foreach($mas as $v2)
 {
     $id = $v2[id];
@@ -212,6 +215,7 @@ foreach($mas as $v2)
 	    //$o2[$id][$item] = $v;
 	    $v = $v3;
 	break;
+	case "AmountSavedToStake":
 	case "RewardAllNow":
 	    $v = hexdec($v);
 	    $v /= 10**18;
@@ -354,7 +358,7 @@ $mas = curl_mas2($jss,$rpc,1);
 $t = time()-$t;
 print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
 
-print_r($mas);
+//print_r($mas);
 foreach($mas as $v2)
 {
     $t = $v2[id];
@@ -371,7 +375,7 @@ foreach($mas as $v2)
     $v /= 10**18;
     $o2[rewardByTime][$time][$grp][$nn] = $v;
 }
-print_r($o2);
+//print_r($o2);
 $a = json_encode($o2,192);
 $f = "res.json";
 file_put_contents($f,$a);
@@ -416,7 +420,7 @@ $mas = curl_mas2($jss,$rpc,1);
 $t = time()-$t;
 print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
 
-print_r($mas);
+//print_r($mas);
 foreach($mas as $v2)
 {
     unset($t2,$t3);
@@ -462,5 +466,105 @@ foreach($mas as $v2)
     $o2[history][$t3[num]] = $t3;
 //    print_r($t3);
 
+}
+
+unset($jss);
+
+
+
+print_r($o2);
+
+$mas = $o2[GroupMemberShow];
+foreach($mas as $grp=>$v3)
+{
+    foreach($v3 as $nn=>$w)
+    {
+$b = "0x3497d8e1";
+$b .= view_number($grp,64,0);
+$b .= view_number(substr($w,2),64,0);
+$t = $time;
+$t = strtotime($t);
+$utime = $t;
+$t = dechex($t);
+$b .= "".view_number($t,64,0);
+//$b .= $v2;
+//0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000a5b32272f2fe16d402fe6da4edff84cd6f8e4aa0
+unset($v,$t);
+//$b .= view_number($i,64,0);
+//$t[from] = $wal;
+$t[from] = "0x0000000000000000000000000000000000000000";
+$t[data] = $b;
+$t[to] = $contractAddress;
+//print_r($t);
+
+$v[jsonrpc] = "2.0";
+$v[method] = "eth_call";
+//$v[params][0] = $row[wal];
+$v[params][0] = $t;
+$v[params][1] = "latest";
+//$v[id] = $row[id];
+$v[id] = "Personal_".$grp."_".($nn+1)."_".$w;
+$jss[] = $v;
+
+    }
+}
+unset($mas);
+print "Send ".count($jss)." requests to blockchain\n";
+$t = $time;
+//print "Get data from blockchain in ".count($jss)." requests\n";
+if(count($jss))
+{
+$mas = curl_mas2($jss,$rpc,1);
+}
+$t = time()-$t;
+print "Get data from blockchain in ".count($jss)." requests [$t sec]\n";
+
+//print_r($mas);
+foreach($mas as $v2)
+{
+
+    $t = $v2[id];
+    $t = explode("_",$t);
+    $id = $t[0];
+    $id = "Personal2";
+    $grp = $t[1];
+    $nn = $t[2];
+    $w = $t[3];
+    $t = substr($v2[result],2);
+    $l = strlen($t)/64;
+    for($i=0;$i<$l;$i++)
+    {
+	$t2 = substr($t,64*$i,64);
+	$v = hexdec($t2);
+//	print $v2[id]."\t$i\t$t2\t$v\n";
+	switch($i)
+	{
+	    case "0":
+		$k = "nn";
+	    break;
+	    case "1":
+		$k = "staked";
+		$v /= 10**18;;
+	    break;
+	    case "2":
+		$k = "payed";
+		$v /= 10**18;;
+	    break;
+	    case "3":
+		$k = "added";
+		$v = date("Y-m-d H:i:s",$v);
+	    break;
+	    case "4":
+		$k = "updated";
+		$v = date("Y-m-d H:i:s",$v);
+	    break;
+	    default:
+	    $k = $i;
+	}
+	$o2[$id][$grp][$nn][w] = $w;
+	$o2[$id][$grp][$nn][$k] = $v;
+	//$t3[$i] = 
+    }
+    print "\n";
 }
 print_r($o2);
