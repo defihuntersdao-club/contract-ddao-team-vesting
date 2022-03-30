@@ -24,7 +24,6 @@ interface IToken
 contract DDAOTeamClaim is AccessControl
 {
     using SafeMath  for uint256;
-//    using SafeMath  for uint32;
     using SafeERC20 for IERC20;
 
     event eClaim(uint8 grp,address addr,uint256 amount,uint256 payed);
@@ -40,6 +39,14 @@ contract DDAOTeamClaim is AccessControl
     mapping(uint8 => address[])public MemberAddr;
     mapping(uint8 => uint8[])public MemberKoef;
     mapping(uint8 => mapping(address => uint8))	public MemberNum;
+
+    mapping(address => membergrp)public MemberGrp;
+
+    struct membergrp
+    {
+	bool enable;
+	uint8 grp;
+    }
 
     mapping(uint8 => mapping(address => uint256))public MemberEpoch;
 
@@ -78,20 +85,9 @@ contract DDAOTeamClaim is AccessControl
 	bool closed;
 	uint48 time_start;
 	uint48 time_end;
-//	uint256 amount;
 	mapping(uint8 => uint8[]) arr;
-//	uint8[] arr1;
-//	uint8[] arr2;
-//	uint8[] arr3;
-//	uint8[] arr4;
 	uint8[] sum;
-//	uint8 sum2;
-//	uint8 sum3;
-//	uint8 sum4;
 	uint8[] grp;
-//	uint8 grp2;
-//	uint8 grp3;
-//	uint8 grp4;
 	uint8 grp_sum;
 
     }
@@ -127,18 +123,22 @@ contract DDAOTeamClaim is AccessControl
                 AddrDDAO = 0x086F80a0ebC2a92bBb3e4476b30f67D058a4c26A;
             }
 
+            if(block.chainid == 137)
+            {
+                AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
+            }
+
             GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90);
             GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5);
             GroupMemberAdd(1,0x5BB72943dFd6201897d163D06DaEC4c4557Ab25c, 5);
 
-            GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,45);
+            GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,100);
 
-            GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,10);
+            GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,100);
 
-	    GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45);
-	    GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45);
+	    GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,50);
+	    GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,50);
 
-//	    GroupMemberChange(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,5);
 	    EpochNext();
 	}
         // Start: Admin functions
@@ -167,10 +167,6 @@ contract DDAOTeamClaim is AccessControl
                 revokeRole(DEFAULT_ADMIN_ROLE, account);
                 emit adminModify('Admin deleted',account);
         }
-    /**
-    Список адрес, які можуть бути адміном
-    Потрібно перевірити: IsAdmin(address)
-    **/
     function AdminList()public view returns(address[] memory)
     {
         return Admins;
@@ -206,6 +202,8 @@ contract DDAOTeamClaim is AccessControl
 	UpdateNeed = true;
 	MemberEpoch[grp][addr] = EpochCount.add(1);
 	Payed[grp][addr] = 0;
+	MemberGrp[addr].enable = true;
+	MemberGrp[addr].grp = grp;
     }
     function GroupMemberChange(uint8 grp,address addr, uint8 koef)public onlyAdmin
     {
@@ -281,16 +279,14 @@ contract DDAOTeamClaim is AccessControl
 
     function RewardCalc(uint8 grp, address addr, uint48 time)public view returns(uint256 amount)
     {
-//	uint256 amount ;
 	amount = 0;
 	reward_calc memory temp;
 	bool flag = false;
 	uint8 num = MemberNum[grp][addr];
 	if(time == 0)time = uint48(block.timestamp);
 
-	for(uint256 i = 1;i <= EpochCount;i++)
+	for(uint256 i = MemberEpoch[grp][addr];i <= EpochCount;i++)
 	{
-	    if(MemberEpoch[grp][addr] > i)continue;
 
 	    if(!flag)
 	    {
@@ -306,11 +302,8 @@ contract DDAOTeamClaim is AccessControl
 		else temp.time_end = Epoch[i].time_end;
 		
 		temp.interval = temp.time_end - Epoch[i].time_start;
-//		amount = temp.interval;
-//		amount = PartTime(temp.interval);
 
 		temp.part_time = PartTime(temp.interval);
-//		amount = temp.part_time;
 
 		temp.part_grp  = PartAmount(Epoch[i].grp[grp-1],Epoch[i].grp_sum);
 		temp.part_user = PartAmount(Epoch[i].arr[grp][num-1],Epoch[i].sum[grp-1]);
@@ -369,9 +362,30 @@ contract DDAOTeamClaim is AccessControl
 
         emit eClaim(grp,addr,amount_to_send,Payed[grp][addr]);
     }
+
+    function Claim(address addr)public
+    {
+	Claim(MemberGrp[addr].grp,addr,0);
+    }
+
     function ClaimAmount(uint8 grp, address addr)public view returns(uint256 amount)
     {
 	amount = RewardCalc(grp,addr,0) - Payed[grp][addr];
     }
-    
+    function GroupMemberShow(uint8 grp)public view returns(address[] memory out)
+    {
+        out = MemberAddr[grp];
+    }
+    function EpochViewArr(uint256 epoch_num,uint8 grp)public view returns(uint8[] memory out)
+    {
+	out = Epoch[epoch_num].arr[grp];
+    }
+    function EpochViewSum(uint256 epoch_num,uint8 grp)public view returns(uint8 out)
+    {
+	out = Epoch[epoch_num].sum[grp-1];
+    }
+    function EpochViewGrp(uint256 epoch_num,uint8 grp)public view returns(uint8 out)
+    {
+	out = Epoch[epoch_num].grp[grp-1];
+    }
 }
