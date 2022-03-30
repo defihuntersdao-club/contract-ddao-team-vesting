@@ -18,208 +18,167 @@ interface IToken
     function totalSupply() external view  returns (uint256);
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
     function transfer(address recipient, uint256 amount) external;
-    function AdminGetToken(address tokenAddress, uint256 amount) external; 
+    function AdminGetToken(address tokenAddress, uint256 amount) external;
 }
 
 contract DDAOTeamClaim is AccessControl
 {
     using SafeMath  for uint256;
+//    using SafeMath  for uint32;
     using SafeERC20 for IERC20;
 
-    uint48  constant public TimeStart 	= 1646092800; // 1 MAR 2022
-    uint256 constant public AmountMax 	= 1680000;
-    uint48  constant public TimeEnd 	= TimeStart + 24 * 86400*30;
+    event eClaim(uint8 grp,address addr,uint256 amount,uint256 payed);
+
+    uint48  constant public TimeStart   = 1646092800; // 1 MAR 2022
+    uint256 constant public AmountMax   = 1680000;
+    uint48  constant public TimeEnd     = TimeStart + 24 * 86400*30;
+
+    address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
+
+    mapping(uint8 => uint8)public Group;
+    mapping(uint8 => uint8)public GroupLen;
+    mapping(uint8 => address[])public MemberAddr;
+    mapping(uint8 => uint8[])public MemberKoef;
+    mapping(uint8 => mapping(address => uint8))	public MemberNum;
+
+    mapping(uint8 => mapping(address => uint256))public MemberEpoch;
+
+    mapping(uint8 => mapping(address => uint256))public Payed;
+
     uint48  immutable public TimeDeploy;
     uint256 immutable public BlockDeploy;
 
-    address public AddrDDAO = 0x90F3edc7D5298918F7BB51694134b07356F7d0C7;
-    address public AddrProxy = 0x2E7bEC36f8642Cc3df83C19470bE089A5FAF98Fa;
-    uint48  public TimeUpdate;
-    uint48  public TimeStakeRecalc;
-
-    mapping(uint8 => uint8)public Group;
-    bool public Enable = true;
+    uint256 public EpochCount = 0;
 
     mapping(uint8 => mapping(address => uint8))public Member;
+
+    bool public UpdateNeed = false;
+
+    bool public Enable = true;
+
+    mapping(uint256 => epoch) public Epoch;
 
     uint256 public HistoryNum;
     mapping (uint256 => history)public History;
 
-    struct history
+   struct history
     {
-	uint256 num;
-	address addr;
-	uint256 amount;
-	uint256 payed;
-	uint48 time;
-	uint256 blk;
+        uint256 num;
+        address addr;
+        uint256 amount;
+        uint256 payed;
+        uint48 time;
+        uint256 blk;
     }
 
-    struct personal
+
+    struct epoch
     {
-	uint8 id;
-	uint256 staked;
-	uint256 payed;
-	uint48  added;
-	uint48  updated;
+	uint32 num;
+	bool closed;
+	uint48 time_start;
+	uint48 time_end;
+//	uint256 amount;
+	mapping(uint8 => uint8[]) arr;
+//	uint8[] arr1;
+//	uint8[] arr2;
+//	uint8[] arr3;
+//	uint8[] arr4;
+	uint8[] sum;
+//	uint8 sum2;
+//	uint8 sum3;
+//	uint8 sum4;
+	uint8[] grp;
+//	uint8 grp2;
+//	uint8 grp3;
+//	uint8 grp4;
+	uint8 grp_sum;
+
     }
-    mapping(uint8 => mapping(address => personal))public Personal;
 
-    event eStakeRecalc(uint8 id,uint8 nn,address addr,uint256 amount,uint256 staked,uint256 payed,uint48 time);
-    event eClaim(uint8 id,address addr,uint256 amount,uint256 payed,uint256 prev_staked);
+        constructor()
+        {
+        TimeDeploy      = uint48(block.timestamp);
+        BlockDeploy     = block.number;
+        // TECH TEAM
+        Group[1] = 10;
+        // ADVISER
+        Group[2] = 10;
+        // FUND
+        Group[3] = 30;
+        // FOUNDERS
+        Group[4] = 50;
 
-	mapping(uint8 => mapping(uint8 => address))public GroupMember;
-	mapping(uint8 => address[]) GroupMemberAddr;
-	mapping(uint8 => uint8)public GroupLen;
-	function GroupMemberAdd(uint8 id,address addr,uint8 val,uint48 time)public onlyAdmin
-	{
-	    require(GroupLen[id]<256,"The group is full");
-	    if(TimeDeploy != block.timestamp)StakeRecalc();
-	    GroupLen[id]++;
-	    Member[id][addr] = val;
-	    GroupMember[id][GroupLen[id]] = addr;
-	    GroupMemberAddr[id].push(addr);
-	    Personal[id][addr].id = GroupLen[id];
-	    Personal[id][addr].staked = 0;
-	    Personal[id][addr].payed = 0;
+            GroupLen[1] = 0;
+            GroupLen[2] = 0;
+            GroupLen[3] = 0;
+            GroupLen[4] = 0;
+            _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+            Admins.push(_msgSender());
+            AdminAdd(0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
 
-	    if(time != 0)
-	    {
-	    Personal[id][addr].updated = time;
-	    }
-	    else
-	    {
-	    Personal[id][addr].updated = uint48(block.timestamp);
-	    }
+            if( block.chainid == 80001)
+            {
+                AddrDDAO = 0xE1F0e40846218bF2CACfEd40c00bE218F54C49f7;
+            }
 
-	    if(TimeDeploy == block.timestamp && time == TimeStart)
-	    {
-	    Personal[id][addr].added = TimeStart;
-	    }
-	    else
-	    {
-	        if(time != 0)
-    		{
-	        Personal[id][addr].added = time;
-    		}
-    		else
-    		{
-    	        Personal[id][addr].added = uint48(block.timestamp);
-    		}
-	    }
+            if( block.chainid == 3)
+            {
+                AddrDDAO = 0x086F80a0ebC2a92bBb3e4476b30f67D058a4c26A;
+            }
 
+            GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90);
+            GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5);
+            GroupMemberAdd(1,0x5BB72943dFd6201897d163D06DaEC4c4557Ab25c, 5);
+
+            GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,45);
+
+            GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,10);
+
+	    GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45);
+	    GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45);
+
+//	    GroupMemberChange(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,5);
+	    EpochNext();
 	}
-	function GroupMemberChange(uint8 id,address addr,uint8 val)public onlyAdmin
-	{
-	    Member[id][addr] = val;
-	}
-	function GroupMemberShow(uint8 id)public view returns(address[] memory out)
-	{
-		out = GroupMemberAddr[id];
-	}
-	function GroupMaxVal(uint8 id)public view returns(uint8 val)
-	{
-	    address a;
-	    for(uint8 i=1;i <= GroupLen[id];i++)
-	    {
-		a = GroupMember[id][i]; 
-		val += Member[id][a];
-	    }
-	}
-	function GroupMemberVal(uint8 id,address addr)public view returns(uint8)
-	{
-	    return Member[id][addr];
-	}
-	constructor() 
-	{
-	TimeDeploy 	= uint48(block.timestamp);
-	BlockDeploy 	= block.number;
-	TimeUpdate = TimeStart;
-        // TECH TEAM 
-	Group[1] = 10;
-	// ADVISER
-	Group[2] = 10;
-	// FUND
-	Group[3] = 30;
-	// FOUNDERS
-	Group[4] = 50;
-
-	    GroupLen[1] = 0;
-	    GroupLen[2] = 0;
-	    GroupLen[3] = 0;
-	    GroupLen[4] = 0;
-	    _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-	    Admins.push(_msgSender());
-	    //_setupRole(DEFAULT_ADMIN_ROLE, 0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
-	    //AdminAdd(_msgSender());
-	    AdminAdd(0x208b02f98d36983982eA9c0cdC6B3208e0f198A3);
-
-		GroupMemberAdd(1,0x330eC7c6AfC3cF19511Ad4041e598B235D44862f,90,TimeStart);
-		GroupMemberAdd(1,0x57266f25439B60A94e4a47Cbc1bF1A2A6C119109, 5,TimeStart);
-		GroupMemberAdd(1,0x5BB72943dFd6201897d163D06DaEC4c4557Ab25c, 5,TimeStart);
-
-		GroupMemberAdd(2,0xB7E0cC3b51AFD812C1C4aeFd437D3c5daC0D4efF,45,TimeStart);
-
-		GroupMemberAdd(3,0x0954409a3cfA81F05fE7421f3Aa162146a28b848,10,TimeStart);
-
-		GroupMemberAdd(4,0xeA10DD05CF0A12AB1BDBd202FA8707D3BFd08737,45,TimeStart);
-		GroupMemberAdd(4,0xD54201a17a0b00F5726a38EE6bcCae1371631Dd6,45,TimeStart);
-
-	    if( block.chainid == 80001)
-	    {
-		AddrDDAO = 0xE1F0e40846218bF2CACfEd40c00bE218F54C49f7;
-		AddrProxy = 0xc17b56bbD2430242A66725f31D7f28586BeF8227;
-	    }
-
-	    if( block.chainid == 3)
-	    {
-		AddrDDAO = 0x086F80a0ebC2a92bBb3e4476b30f67D058a4c26A;
-		AddrProxy = 0x8356B4Dd5397Dd8519512562c92b8EC14Df73541;
-	    }
-
-	    StakeRecalc();
-	    GroupMemberAdd(1,0x34B40BA116d5Dec75548a9e9A8f15411461E8c70, 90,0);
-	}
-
-	// Start: Admin functions
-	event adminModify(string txt, address addr);
-	address[] Admins;
-	modifier onlyAdmin() 
-	{
-		require(IsAdmin(_msgSender()), "Access for Admin's only");
-		_;
-	}
-	function IsAdmin(address account) public virtual view returns (bool)
-	{
-		return hasRole(DEFAULT_ADMIN_ROLE, account);
-	}
-	function AdminAdd(address account) public virtual onlyAdmin
-	{
-		require(!IsAdmin(account),'Account already ADMIN');
-		grantRole(DEFAULT_ADMIN_ROLE, account);
-		emit adminModify('Admin added',account);
-		Admins.push(account);
-	}
-	function AdminDel(address account) public virtual onlyAdmin
-	{
-		require(IsAdmin(account),'Account not ADMIN');
-		require(_msgSender()!=account,'You can`t remove yourself');
-		revokeRole(DEFAULT_ADMIN_ROLE, account);
-		emit adminModify('Admin deleted',account);
-	}
+        // Start: Admin functions
+        event adminModify(string txt, address addr);
+        address[] Admins;
+        modifier onlyAdmin()
+        {
+                require(IsAdmin(_msgSender()), "Access for Admin's only");
+                _;
+        }
+        function IsAdmin(address account) public virtual view returns (bool)
+        {
+                return hasRole(DEFAULT_ADMIN_ROLE, account);
+        }
+        function AdminAdd(address account) public virtual onlyAdmin
+        {
+                require(!IsAdmin(account),'Account already ADMIN');
+                grantRole(DEFAULT_ADMIN_ROLE, account);
+                emit adminModify('Admin added',account);
+                Admins.push(account);
+        }
+        function AdminDel(address account) public virtual onlyAdmin
+        {
+                require(IsAdmin(account),'Account not ADMIN');
+                require(_msgSender()!=account,'You can`t remove yourself');
+                revokeRole(DEFAULT_ADMIN_ROLE, account);
+                emit adminModify('Admin deleted',account);
+        }
     /**
     Список адрес, які можуть бути адміном
     Потрібно перевірити: IsAdmin(address)
     **/
     function AdminList()public view returns(address[] memory)
     {
-	return Admins;
+        return Admins;
     }
     function AdminGetCoin(uint256 amount) public onlyAdmin
     {
         payable(_msgSender()).transfer(amount);
     }
-
     function AdminGetToken(address tokenAddress, uint256 amount) public onlyAdmin
     {
         IERC20 ierc20Token = IERC20(tokenAddress);
@@ -227,220 +186,192 @@ contract DDAOTeamClaim is AccessControl
     }
     function AdminGetNft(address tokenAddress, uint256 token_id)public onlyAdmin
     {
-	IToken(tokenAddress).safeTransferFrom(address(this),_msgSender(),token_id);
+        IToken(tokenAddress).safeTransferFrom(address(this),_msgSender(),token_id);
     }
     // End: Admin functions
 
     function ChainId()public view returns(uint256)
     {
-	return block.chainid;
+        return block.chainid;
     }
-    function GroupChange(uint8 id,uint8 val)public onlyAdmin
+
+    function GroupMemberAdd(uint8 grp,address addr, uint8 koef)public onlyAdmin
     {
-	Group[id] = val;
+        require(GroupLen[grp]<256,"The group is full");
+	require(MemberEpoch[grp][addr]==0,"Member already exist");
+        GroupLen[grp]++;
+        MemberKoef[grp].push(koef);
+        MemberAddr[grp].push(addr);
+        MemberNum[grp][addr] 		= GroupLen[grp];
+	UpdateNeed = true;
+	MemberEpoch[grp][addr] = EpochCount.add(1);
+	Payed[grp][addr] = 0;
     }
-    struct ret
+    function GroupMemberChange(uint8 grp,address addr, uint8 koef)public onlyAdmin
     {
-	address addr;
-	uint256 amount;
-	uint256 part_by_group;
-	uint256 part_in_group_by_member;
-	uint256 part_by_addr;
-	uint256 reward_all;
+	uint8 i;
+	i = MemberNum[grp][addr]-1;
+	MemberKoef[grp][i] = koef;
+	UpdateNeed = true;
     }
-    function RewardCalc(uint8 id, uint8 nn, uint48 time)public view returns(ret memory b)
+    function GroupKoefShow(uint8 grp)public view returns(uint8[] memory)
     {
-	uint256 x;
-	uint256 y;
-	uint256 z;
-	uint256 r;
-	address addr;
-	x = Group[1] + Group[2] + Group[3] + Group[4];
-	b.part_by_group = x;
-	r = RewardAllNow(time);
-
-	b.reward_all = r;
-
-	    addr = GroupMember[id][nn];
-	    b.addr = addr;
-	    y = Group[id];
-	    y *= 10**18;
-	    y = y/x;
-
-	    x = GroupMaxVal(id);
-	    b.part_in_group_by_member = x;
-	    z = Member[id][addr];
-	    b.part_by_addr = z;
-	    //b.z = z;
-	    z *= 10**18;
-	    z = z/x;
-	    
-	    x = z*y;
-	    b.amount = r * x / 10**36;
-	    b.amount = b.amount.add(Personal[id][addr].staked);
+	return MemberKoef[grp];
     }
-    event eRecalc(uint256 time,uint256 block,address addr,uint8 group,uint256 part_group,uint256 part_member,uint256 amount);
-    uint256 public AmountSavedToStake = 0;
-    function RewardAllNow(uint48 time)public view returns(uint256 s)
+    function GroupKoefSum(uint8 grp)public view returns(uint8 sum)
     {
-	uint48 t;
-	uint48 d;
-
-	if(time == 0)
-	t = uint48(block.timestamp);
-	else
-	t = time;
-	if(t > TimeEnd) t = TimeEnd;
-
-	d = t-TimeUpdate;
-	s = AmountMax * 10**18 ;
-	s = s * (TimeEnd - TimeUpdate) / (TimeEnd - TimeStart);
-	s = s * d / (TimeEnd - TimeStart);
-
-    }
-    function RewardAllNow2(uint48 time)public view returns(uint256 s)
-    {
-	uint48 t;
-	uint48 d;
-
-	if(time == 0)
-	t = uint48(block.timestamp);
-	else
-	t = time;
-	if(t > TimeEnd) t = TimeEnd;
-
-	d = t-TimeUpdate;
-	s = AmountMax * 10**18;
-	s = s * d / (TimeEnd - TimeStart);
-
-    }
-    function RewardByAddr(uint8 id,address addr,bool without_payed)public view returns(uint256)
-    {
-	uint256 adder;
-	ret memory val;
-	for(uint8 j=1;j <= GroupLen[id];j++)
+	for(uint8 i = 0;i < MemberKoef[grp].length;i++)
 	{
-	    if(GroupMember[id][j] == addr)
+	    sum += MemberKoef[grp][i];
+	}
+    }
+    function EpochNext()public onlyAdmin
+    {
+	uint48 now_time = uint48(block.timestamp);
+	require(UpdateNeed,"No members change. No need next epoch.");
+	require(now_time < TimeEnd,"The contract has already expired.");
+	if(EpochCount >0)
+	{
+	    Epoch[EpochCount].closed = true;
+	    Epoch[EpochCount].time_end = now_time;
+	}
+	EpochCount = EpochCount.add(1);
+
+	if(EpochCount == 1)
+	    Epoch[EpochCount].time_start = TimeStart;
+	else
+	    Epoch[EpochCount].time_start = now_time+1;
+
+	    Epoch[EpochCount].time_end = TimeEnd;
+
+	    Epoch[EpochCount].arr[1] = GroupKoefShow(1);
+	    Epoch[EpochCount].arr[2] = GroupKoefShow(2);
+	    Epoch[EpochCount].arr[3] = GroupKoefShow(3);
+	    Epoch[EpochCount].arr[4] = GroupKoefShow(4);
+
+	    Epoch[EpochCount].sum.push(GroupKoefSum(1));
+	    Epoch[EpochCount].sum.push(GroupKoefSum(2));
+	    Epoch[EpochCount].sum.push(GroupKoefSum(3));
+	    Epoch[EpochCount].sum.push(GroupKoefSum(4));
+
+	    Epoch[EpochCount].grp.push(Group[1]);
+	    Epoch[EpochCount].grp.push(Group[2]);
+	    Epoch[EpochCount].grp.push(Group[3]);
+	    Epoch[EpochCount].grp.push(Group[4]);
+	    Epoch[EpochCount].grp_sum = Epoch[EpochCount].grp[0] + Epoch[EpochCount].grp[1] + Epoch[EpochCount].grp[2] + Epoch[EpochCount].grp[3];
+	    Epoch[EpochCount].closed = false;
+
+	UpdateNeed = false;
+    }
+
+    struct reward_calc
+    {
+	uint48 interval;
+	uint48 time_end;
+
+	uint256 part_time;
+	uint256 part_grp;
+	uint256 part_user;
+
+	uint256 amount_all;
+	uint256 amount_grp;
+	uint256 amount_usr;
+	
+    }
+
+    function RewardCalc(uint8 grp, address addr, uint48 time)public view returns(uint256 amount)
+    {
+//	uint256 amount ;
+	amount = 0;
+	reward_calc memory temp;
+	bool flag = false;
+	uint8 num = MemberNum[grp][addr];
+	if(time == 0)time = uint48(block.timestamp);
+
+	for(uint256 i = 1;i <= EpochCount;i++)
+	{
+	    if(MemberEpoch[grp][addr] > i)continue;
+
+	    if(!flag)
 	    {
-		if(without_payed)adder = Personal[id][addr].payed;
-		val = RewardCalc(id,j,0);
-		val.amount -= adder;
-		return val.amount;
+
+	    if(Epoch[i].time_start > time)flag = true;
+	    else
+	    {
+
+
+		if(Epoch[i].time_end > time)flag = true;
+
+		if(time < Epoch[i].time_end)temp.time_end = time;
+		else temp.time_end = Epoch[i].time_end;
+		
+		temp.interval = temp.time_end - Epoch[i].time_start;
+//		amount = temp.interval;
+//		amount = PartTime(temp.interval);
+
+		temp.part_time = PartTime(temp.interval);
+//		amount = temp.part_time;
+
+		temp.part_grp  = PartAmount(Epoch[i].grp[grp-1],Epoch[i].grp_sum);
+		temp.part_user = PartAmount(Epoch[i].arr[grp][num-1],Epoch[i].sum[grp-1]);
+
+		temp.amount_all = AmountMax * temp.part_time / 10**8;
+		temp.amount_grp = temp.amount_all * temp.part_grp / 10**8;
+		temp.amount_usr = temp.amount_grp * temp.part_user / 10**8;
+		temp.amount_usr /= 10**12;
+
+		amount = amount.add(temp.amount_usr);
+
 	    }
-	}
-	return 0;
-    }
-    //uint8 public claim_debug = 0;
-    function Claim(uint8 id,address addr,uint256 amount)public
-    {
-	require(Enable,"Contract not Enabled (or Disabled)");
-	uint256 amount2;
-	uint256 balanceOfToken;
-	amount2 = RewardByAddr(id,addr,false);
-	require(amount <= amount2,"You cannot get more than the tokens credited");
-	if(amount < amount2 && amount > 0)amount2 = amount;
-	uint256 amount_to_send = amount2;
-	//require(debug != 1,"Test debug 1");	
 
-	if(Personal[id][addr].payed > 0)
-	amount_to_send = amount_to_send.div(Personal[id][addr].payed);
+	    }
 
-	//require(debug != 2,"Test debug 2");
-
-	uint256 prev_staked = 0;
-	if(Personal[id][addr].staked > 0)
-	{
-	amount_to_send = amount2.add(Personal[id][addr].staked);
-	prev_staked = Personal[id][addr].staked;
 	}
 
-	//require(debug != 3,"Test debug 3");
-
-	balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
-	if(balanceOfToken < amount_to_send)
-	{
-	    TokenGetFromVesting(amount_to_send - balanceOfToken);
-	    balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
-	}
-	require(balanceOfToken >= amount_to_send,"Not enough balance of DDAO on contract. Contact with administration");
-
-	Personal[id][addr].payed = Personal[id][addr].payed.add(amount_to_send);
-	Personal[id][addr].staked = 0;
-	//require(debug != 4,"Test debug 4");
-
-	IToken(AddrDDAO).transfer(addr,amount_to_send);
-	HistoryNum = HistoryNum.add(1);
-	History[HistoryNum].num = HistoryNum;
-	History[HistoryNum].addr = addr;
-	History[HistoryNum].amount = amount_to_send;
-	History[HistoryNum].time = uint48(block.timestamp);
-	History[HistoryNum].payed = Personal[id][addr].payed;
-	History[HistoryNum].blk = uint48(block.number);
-
-	//require(debug != 5,"Test debug 5");
-
-	emit eClaim(id,addr,amount_to_send,Personal[id][addr].payed,prev_staked);
-	//require(debug != 6,"Test debug 6");
-	//StakeRecalc();
-	//claim_debug += 1;
-	//require(debug != 7,"Test debug 7");
+    if(amount == 0)amount = 2;
 
     }
-    function StakeRecalc()public
+    function PartTime(uint48 interval)public pure returns(uint256 out)
     {
-	require(Enable,"Contract not Enabled (or Disabled)");
-	require(TimeStakeRecalc < uint48(block.timestamp),"It is forbidden to count the steak several times in one block");
-	address addr;
-	ret memory r;
-	AmountSavedToStake = AmountSavedToStake.add(RewardAllNow(0));
-
-	for(uint8 i=1;i <= 4;i++)
-	{
-	for(uint8 j=1;j <= GroupLen[i];j++)
-	{
-	    addr = GroupMember[i][j];
-	    r = RewardCalc(i,j,0);
-	    Personal[i][addr].staked = Personal[i][addr].staked.add(r.amount);
-	    emit eStakeRecalc(i,j,addr,r.amount,Personal[i][addr].staked,Personal[i][addr].payed,uint48(block.timestamp));
-	}
-	}
-	TimeUpdate 	= uint48(block.timestamp);
-	TimeStakeRecalc = uint48(block.timestamp);
-    }
-    function TokenBalance()public view returns(uint256)
+	uint256 sum = TimeEnd - TimeStart;
+	uint256 i = uint256(interval) * 10**18;
+	out = i / sum;
+    } 
+    function PartAmount(uint8 val, uint8 sum)public pure returns(uint256 out)
     {
-	return IToken(AddrDDAO).balanceOf(address(this));
-    }
-    function TokenGetFromVesting(uint256 balance)public onlyAdmin
-    {
-	if(balance == 0)
-	balance = IToken(AddrDDAO).balanceOf(AddrProxy);
-	IToken(AddrProxy).AdminGetToken(AddrDDAO, balance); 
-    }
-    function AddrProxyChange(address addr)public onlyAdmin
-    {
-	AddrProxy = addr;
-    }
-    function AddrDDAOChange(address addr)public onlyAdmin
-    {
-	AddrDDAO = addr;
-    }
-    function TimeNow()public view returns(uint256)
-    {
-	return block.timestamp;
+	uint256 i = uint256(val) * 10**18;
+	out = i / uint256(sum);
     }
     function EnabledSet(bool TrueOrFalse)public onlyAdmin
     {
-	Enable = TrueOrFalse;
+        Enable = TrueOrFalse;
     }
-    function PayedByAddr(uint8 id,address addr)public view returns(uint256)
+    function Claim(uint8 grp,address addr,uint256 amount)public
     {
-	return Personal[id][addr].payed;
+	require(Enable,"Contract not Enabled (or Disabled)");
+	uint256 amount_to_send = RewardCalc(grp,addr,0);
+	amount_to_send = amount_to_send.sub(Payed[grp][addr]);
+        require(amount <= amount_to_send,"You cannot get more than the tokens credited");
+        if(amount < amount_to_send && amount > 0)amount_to_send = amount;
+
+        uint256 balanceOfToken = IToken(AddrDDAO).balanceOf(address(this));
+	require(balanceOfToken >= amount_to_send,"Not enough balance of DDAO on contract. Contact with administration");
+
+	Payed[grp][addr] = Payed[grp][addr].add(amount_to_send);
+        IToken(AddrDDAO).transfer(addr,amount_to_send);
+        HistoryNum = HistoryNum.add(1);
+        History[HistoryNum].num    = HistoryNum;
+        History[HistoryNum].addr   = addr;
+        History[HistoryNum].amount = amount_to_send;
+        History[HistoryNum].time   = uint48(block.timestamp);
+        History[HistoryNum].blk    = block.number;
+        History[HistoryNum].payed  = Payed[grp][addr];
+
+        emit eClaim(grp,addr,amount_to_send,Payed[grp][addr]);
     }
-    function StakedByAddr(uint8 id,address addr)public view returns(uint256)
+    function ClaimAmount(uint8 grp, address addr)public view returns(uint256 amount)
     {
-	return Personal[id][addr].staked;
+	amount = RewardCalc(grp,addr,0) - Payed[grp][addr];
     }
-
-
+    
 }
